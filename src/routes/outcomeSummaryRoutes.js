@@ -6,6 +6,5 @@ const outcomeSummaryController = require('../controllers/outcomeSummaryControlle
 
 router.get('/', auth, outcomeSummaryController.getOutcomeSummaries);
 router.post('/', auth, outcomeSummaryController.addOutcomeSummary);
-router.delete('/:id', auth, outcomeSummaryController.deleteOutcomeSummary);
 
 module.exports = router;
