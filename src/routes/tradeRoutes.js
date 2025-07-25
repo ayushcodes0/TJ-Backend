@@ -9,5 +9,7 @@ router.get('/', auth, tradeController.getTrades);
 router.get('/:id', auth, tradeController.getTradeById);
 router.put('/:id', auth, tradeController.updateTrade);
 router.delete('/:id', auth, tradeController.deleteTrade);
+router.get('/stats', auth, tradeController.getTradeStats);
+
 
 module.exports = router;

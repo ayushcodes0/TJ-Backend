@@ -21,25 +21,54 @@ exports.createTrade = async (req, res) => {
   }
 };
 
-// Get all trades for logged-in user
+
 exports.getTrades = async (req, res) => {
   try {
-    const trades = await Trade.find({ user_id: req.user._id }).sort({ date: -1 });
-    res.status(200).json({
-        data: trades,
-        message: 'Trades retrieved successfully',
-        success: true,
-        error: false,
-    })
+    const { filter, year, month, day } = req.query;
+    const userId = req.user._id;
+    let dateFilter = {};
+
+    if (filter === 'day' && year && month && day) {
+      // Specific day
+      const start = new Date(year, month - 1, day, 0, 0, 0);
+      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+      dateFilter = { date: { $gte: start, $lte: end } };
+    } else if (filter === 'month' && year && month) {
+      // Entire month
+      const start = new Date(year, month - 1, 1, 0, 0, 0);
+      const endMonth = (parseInt(month) === 12) ? 1 : parseInt(month) + 1;
+      const endYear = (parseInt(month) === 12) ? parseInt(year) + 1 : parseInt(year);
+      const end = new Date(endYear, endMonth - 1, 1, 0, 0, 0);
+      dateFilter = { date: { $gte: start, $lt: end } };
+    } else if (filter === 'year' && year) {
+      // Entire year
+      const start = new Date(year, 0, 1, 0, 0, 0);
+      const end = new Date(parseInt(year) + 1, 0, 1, 0, 0, 0);
+      dateFilter = { date: { $gte: start, $lt: end } };
+    } else if (filter === 'lifetime') {
+      // No filter
+      dateFilter = {};
+    } else {
+      return res.status(400).json({ message: 'Invalid or missing filter parameters', success: false, error: true });
+    }
+
+    const trades = await Trade.find({ user_id: userId, ...dateFilter }).sort({ date: -1 });
+    res.json({
+      data: trades,
+      message: 'Trades retrieved successfully',
+      success: true,
+      error: false,
+    });
   } catch (error) {
-    console.error('[GetTrades] Error:', error.message);
+    console.error('[getTrades - date filter] Error:', error.message);
     res.status(500).json({
-        message: error.message,
-        success: false,
-        error: true,
+      message: error.message,
+      success: false,
+      error: true,
     });
   }
 };
+
 
 // Get a single trade by ID
 exports.getTradeById = async (req, res) => {
@@ -127,3 +156,79 @@ exports.deleteTrade = async (req, res) => {
     });
   }
 };
+
+
+exports.getTradeStats = async (req, res) => {
+  try {
+    const { filter, year, month, day } = req.query;
+    const userId = req.user._id;
+    let dateFilter = {};
+
+    if (filter === 'day' && year && month && day) {
+      const start = new Date(year, month - 1, day, 0, 0, 0);
+      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+      dateFilter.date = { $gte: start, $lte: end };
+    } 
+    else if (filter === 'month' && year && month) {
+      const start = new Date(year, month - 1, 1, 0, 0, 0);
+      const endMonth = (parseInt(month) === 12) ? 1 : parseInt(month) + 1;
+      const endYear = (parseInt(month) === 12) ? parseInt(year) + 1 : parseInt(year);
+      const end = new Date(endYear, endMonth - 1, 1, 0, 0, 0);
+      dateFilter.date = { $gte: start, $lt: end };
+    } 
+    else if (filter === 'year' && year) {
+      const start = new Date(year, 0, 1, 0, 0, 0);
+      const end = new Date(parseInt(year) + 1, 0, 1, 0, 0, 0);
+      dateFilter.date = { $gte: start, $lt: end };
+    }
+
+    // Aggregation Pipeline for user stats
+    const pipeline = [
+      { $match: { user_id: userId, ...dateFilter } },
+      {
+        $facet: {
+          totalTrades: [ { $count: "count" } ],
+          winCount:    [ { $match: { pnl_amount: { $gt: 0 } } }, { $count: "count" } ],
+          lossCount:   [ { $match: { pnl_amount: { $lt: 0 } } }, { $count: "count" } ],
+          totalPnl:    [ { $group: { _id: null, total: { $sum: "$pnl_amount" } } } ],
+          avgPnl:      [ { $group: { _id: null, avg: { $avg: "$pnl_amount" } } } ],
+          mistakeFreq: [
+            { $unwind: "$psychology.mistakes_made" },
+            { $group: { _id: "$psychology.mistakes_made", count: { $sum: 1 } } }
+          ],
+          strategyFreq: [
+            { $group: { _id: "$strategy", count: { $sum: 1 } } }
+          ]
+        }
+      }
+    ];
+    const statsRaw = await Trade.aggregate(pipeline);
+
+    // Formatting the result
+    const stats = statsRaw[0] || {};
+    res.json({
+      data: {
+        totalTrades: stats.totalTrades[0]?.count || 0,
+        winCount: stats.winCount[0]?.count || 0,
+        lossCount: stats.lossCount[0]?.count || 0,
+        winRate: stats.totalTrades[0]?.count
+          ? ((stats.winCount[0]?.count || 0) / stats.totalTrades[0].count) * 100 : 0,
+        totalPnl: stats.totalPnl[0]?.total || 0,
+        avgPnl: stats.avgPnl[0]?.avg || 0,
+        mistakeFreq: stats.mistakeFreq || [],
+        strategyFreq: stats.strategyFreq || [],
+      },
+      message: 'Stats calculated successfully',
+      success: true,
+      error: false
+    });
+  } catch (error) {
+    console.error('[getTradeStats] Error:', error.message);
+    res.status(500).json({
+      message: error.message,
+      success: false,
+      error: true
+    });
+  }
+};
+
