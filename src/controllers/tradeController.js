@@ -1,4 +1,6 @@
 const Trade = require('../models/Trade');
+const mongoose = require('mongoose');
+
 
 // Create a new trade
 exports.createTrade = async (req, res) => {
@@ -162,68 +164,94 @@ exports.getTradeStats = async (req, res) => {
   try {
     const { filter, year, month, day } = req.query;
     const userId = req.user._id;
+
+    const userIdObj = new mongoose.Types.ObjectId(userId);
     let dateFilter = {};
 
     if (filter === 'day' && year && month && day) {
-      const start = new Date(year, month - 1, day, 0, 0, 0);
-      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
+      const start = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+      const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
       dateFilter.date = { $gte: start, $lte: end };
-    } 
-    else if (filter === 'month' && year && month) {
-      const start = new Date(year, month - 1, 1, 0, 0, 0);
-      const endMonth = (parseInt(month) === 12) ? 1 : parseInt(month) + 1;
-      const endYear = (parseInt(month) === 12) ? parseInt(year) + 1 : parseInt(year);
-      const end = new Date(endYear, endMonth - 1, 1, 0, 0, 0);
+    } else if (filter === 'month' && year && month) {
+      const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
+      const end = new Date(Date.UTC(year, month, 1, 0, 0, 0));
       dateFilter.date = { $gte: start, $lt: end };
-    } 
-    else if (filter === 'year' && year) {
-      const start = new Date(year, 0, 1, 0, 0, 0);
-      const end = new Date(parseInt(year) + 1, 0, 1, 0, 0, 0);
+    } else if (filter === 'year' && year) {
+      const start = new Date(Date.UTC(year, 0, 1, 0, 0, 0));
+      const end = new Date(Date.UTC(parseInt(year) + 1, 0, 1, 0, 0, 0));
       dateFilter.date = { $gte: start, $lt: end };
     }
 
-    // Aggregation Pipeline for user stats
+    const finalFilter = { 
+      user_id: userIdObj,
+      ...dateFilter 
+    };
+
+    // Aggregation Pipeline
     const pipeline = [
-      { $match: { user_id: userId, ...dateFilter } },
+      { $match: finalFilter },
       {
         $facet: {
-          totalTrades: [ { $count: "count" } ],
-          winCount:    [ { $match: { pnl_amount: { $gt: 0 } } }, { $count: "count" } ],
-          lossCount:   [ { $match: { pnl_amount: { $lt: 0 } } }, { $count: "count" } ],
-          totalPnl:    [ { $group: { _id: null, total: { $sum: "$pnl_amount" } } } ],
-          avgPnl:      [ { $group: { _id: null, avg: { $avg: "$pnl_amount" } } } ],
+          totalTrades: [{ $count: "count" }],
+          winCount: [{ $match: { pnl_amount: { $gt: 0 } } }, { $count: "count" }],
+          lossCount: [{ $match: { pnl_amount: { $lt: 0 } } }, { $count: "count" }],
+          totalPnl: [{ $group: { _id: null, total: { $sum: "$pnl_amount" } }}],
+          avgPnl: [{ $group: { _id: null, avg: { $avg: "$pnl_amount" } } }],
           mistakeFreq: [
-            { $unwind: "$psychology.mistakes_made" },
-            { $group: { _id: "$psychology.mistakes_made", count: { $sum: 1 } } }
+            { $unwind: "$psychology.mistakes_made" }, // Updated path to psychology
+            { $group: { _id: "$psychology.mistakes_made", count: { $sum: 1 } } },
+            { $sort: { count: -1 } }
           ],
           strategyFreq: [
-            { $group: { _id: "$strategy", count: { $sum: 1 } } }
+            { $group: { 
+              _id: "$strategy", 
+              count: { $sum: 1 },
+              avgPnl: { $avg: "$pnl_amount" }
+            }},
+            { $sort: { count: -1 } }
+          ],
+          emotionalStates: [
+            { $group: {
+              _id: "$psychology.emotional_state",
+              count: { $sum: 1 },
+              avgPnl: { $avg: "$pnl_amount" }
+            }}
           ]
         }
       }
     ];
-    const statsRaw = await Trade.aggregate(pipeline);
 
-    // Formatting the result
-    const stats = statsRaw[0] || {};
-    res.json({
+    // Execute aggregation
+    const [stats] = await Trade.aggregate(pipeline);
+
+    // Format response
+    const response = {
       data: {
         totalTrades: stats.totalTrades[0]?.count || 0,
         winCount: stats.winCount[0]?.count || 0,
         lossCount: stats.lossCount[0]?.count || 0,
-        winRate: stats.totalTrades[0]?.count
-          ? ((stats.winCount[0]?.count || 0) / stats.totalTrades[0].count) * 100 : 0,
+        winRate: stats.totalTrades[0]?.count 
+          ? (stats.winCount[0]?.count / stats.totalTrades[0].count * 100).toFixed(2) 
+          : 0,
         totalPnl: stats.totalPnl[0]?.total || 0,
-        avgPnl: stats.avgPnl[0]?.avg || 0,
+        avgPnl: stats.avgPnl[0]?.avg ? Number(stats.avgPnl[0].avg.toFixed(2)) : 0,
         mistakeFreq: stats.mistakeFreq || [],
         strategyFreq: stats.strategyFreq || [],
+        emotionalStates: stats.emotionalStates || []
       },
-      message: 'Stats calculated successfully',
+      meta: {
+        filter,
+        dateRange: dateFilter.date || 'all time',
+        userId: userId
+      },
       success: true,
       error: false
-    });
+    };
+
+    res.json(response);
+
   } catch (error) {
-    console.error('[getTradeStats] Error:', error.message);
+    console.error('[getTradeStats] Error:', error);
     res.status(500).json({
       message: error.message,
       success: false,
