@@ -26,37 +26,53 @@ exports.createTrade = async (req, res) => {
 
 exports.getTrades = async (req, res) => {
   try {
-    const { filter, year, month, day } = req.query;
+    const { filter, year, month, day, limit, page } = req.query;
     const userId = req.user._id;
     let dateFilter = {};
 
+    // Date filter logic as before
     if (filter === 'day' && year && month && day) {
-      // Specific day
       const start = new Date(year, month - 1, day, 0, 0, 0);
       const end = new Date(year, month - 1, day, 23, 59, 59, 999);
       dateFilter = { date: { $gte: start, $lte: end } };
     } else if (filter === 'month' && year && month) {
-      // Entire month
       const start = new Date(year, month - 1, 1, 0, 0, 0);
       const endMonth = (parseInt(month) === 12) ? 1 : parseInt(month) + 1;
       const endYear = (parseInt(month) === 12) ? parseInt(year) + 1 : parseInt(year);
       const end = new Date(endYear, endMonth - 1, 1, 0, 0, 0);
       dateFilter = { date: { $gte: start, $lt: end } };
     } else if (filter === 'year' && year) {
-      // Entire year
       const start = new Date(year, 0, 1, 0, 0, 0);
       const end = new Date(parseInt(year) + 1, 0, 1, 0, 0, 0);
       dateFilter = { date: { $gte: start, $lt: end } };
     } else if (filter === 'lifetime') {
-      // No filter
       dateFilter = {};
     } else {
       return res.status(400).json({ message: 'Invalid or missing filter parameters', success: false, error: true });
     }
 
-    const trades = await Trade.find({ user_id: userId, ...dateFilter }).sort({ date: -1 });
+    // Pagination parameters
+    const safeLimit = Math.max(1, Math.min(100, parseInt(limit) || 20));
+    const safePage = Math.max(1, parseInt(page) || 1);
+    const skip = (safePage - 1) * safeLimit;
+
+    // Query with pagination
+    const [trades, total] = await Promise.all([
+      Trade.find({ user_id: userId, ...dateFilter })
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(safeLimit),
+      Trade.countDocuments({ user_id: userId, ...dateFilter })
+    ]);
+
     res.json({
       data: trades,
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.ceil(total / safeLimit),
+      },
       message: 'Trades retrieved successfully',
       success: true,
       error: false,
@@ -70,6 +86,7 @@ exports.getTrades = async (req, res) => {
     });
   }
 };
+
 
 
 // Get a single trade by ID
