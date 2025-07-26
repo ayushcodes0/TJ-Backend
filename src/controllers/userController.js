@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const cloudinary = require('../utils/cloudinary');
 
 // Register
 exports.register = async (req, res) => {
@@ -113,39 +114,59 @@ exports.getProfile = async (req, res) => {
 };
 
 
+
+// This controller is for a route: PATCH /api/users/avatar
 exports.updateAvatar = async (req, res) => {
   try {
-    const { avatar } = req.body;
-    if (!avatar || typeof avatar !== "string") {
+    // Check if file is attached
+    if (!req.file) {
       return res.status(400).json({
-        message: "Invalid or missing avatar URL.",
+        message: 'Please upload an image file.',
         success: false,
         error: true
       });
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { avatar },
-      { new: true, select: "-passwordHash" }
+    // Upload to Cloudinary from buffer
+    const result = await cloudinary.uploader.upload_stream(
+      { folder: 'avatars', resource_type: 'image' },
+      async (error, uploaded) => {
+        if (error || !uploaded) {
+          return res.status(500).json({
+            message: 'Cloudinary upload failed.',
+            success: false,
+            error: true
+          });
+        }
+
+        const user = await User.findByIdAndUpdate(
+          req.user._id,
+          { avatar: uploaded.secure_url },
+          { new: true, select: '-passwordHash' }
+        );
+
+        if (!user) {
+          return res.status(404).json({
+            message: 'User not found.',
+            success: false,
+            error: true
+          });
+        }
+
+        res.json({
+          message: 'Avatar updated successfully.',
+          data: { avatar: user.avatar },
+          success: true,
+          error: false
+        });
+      }
     );
 
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found.",
-        success: false,
-        error: true
-      });
-    }
+    // Pipe the file buffer to Cloudinary's upload stream
+    result.end(req.file.buffer);
 
-    res.json({
-      message: "Avatar updated successfully.",
-      data: { avatar: user.avatar },
-      success: true,
-      error: false
-    });
   } catch (error) {
-    console.error("[UpdateAvatar] Error:", error.message);
+    console.error('[UpdateAvatar] Error:', error.message);
     res.status(500).json({
       message: error.message,
       success: false,
@@ -153,4 +174,5 @@ exports.updateAvatar = async (req, res) => {
     });
   }
 };
+
 
