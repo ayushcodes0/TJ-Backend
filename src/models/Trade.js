@@ -47,4 +47,6 @@ const tradeSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
+tradeSchema.index({ user_id: 1, date: -1 });
+
 module.exports = mongoose.model('Trade', tradeSchema);
