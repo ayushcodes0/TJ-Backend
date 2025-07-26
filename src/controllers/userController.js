@@ -102,3 +102,46 @@ exports.getProfile = async (req, res) => {
     });
   }
 };
+
+
+exports.updateAvatar = async (req, res) => {
+  try {
+    const { avatar } = req.body;
+    if (!avatar || typeof avatar !== "string") {
+      return res.status(400).json({
+        message: "Invalid or missing avatar URL.",
+        success: false,
+        error: true
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { avatar },
+      { new: true, select: "-passwordHash" }
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found.",
+        success: false,
+        error: true
+      });
+    }
+
+    res.json({
+      message: "Avatar updated successfully.",
+      data: { avatar: user.avatar },
+      success: true,
+      error: false
+    });
+  } catch (error) {
+    console.error("[UpdateAvatar] Error:", error.message);
+    res.status(500).json({
+      message: error.message,
+      success: false,
+      error: true
+    });
+  }
+};
+
