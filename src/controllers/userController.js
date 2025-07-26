@@ -18,8 +18,16 @@ exports.register = async (req, res) => {
 
     const user = new User({ username, email, passwordHash });
     await user.save();
+
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
     res.status(201).json({
       message: 'User registered successfully!',
+      token, 
       data: { id: user._id, username: user.username, email: user.email },
       success: true,
       error: false
@@ -33,6 +41,7 @@ exports.register = async (req, res) => {
     });
   }
 };
+
 
 // Login
 exports.login = async (req, res) => {
