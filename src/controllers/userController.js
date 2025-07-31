@@ -2,8 +2,10 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cloudinary = require('../utils/cloudinary');
+const { updateSubscriptionStatus } = require('../helpers/subscription');
 
 // Register
+
 exports.register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -17,7 +19,21 @@ exports.register = async (req, res) => {
     }
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = new User({ username, email, passwordHash });
+    // New code: Grant pro trial for 24hrs
+    const now = new Date();
+    const proExpires = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24hr from now
+
+    const user = new User({
+      username,
+      email,
+      passwordHash,
+      subscription: {
+        plan: 'pro',
+        startedAt: now,
+        expiresAt: proExpires,
+      }
+    });
+
     await user.save();
 
     const token = jwt.sign(
@@ -28,8 +44,13 @@ exports.register = async (req, res) => {
 
     res.status(201).json({
       message: 'User registered successfully!',
-      token, 
-      data: { id: user._id, username: user.username, email: user.email },
+      token,
+      data: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        subscription: user.subscription
+      },
       success: true,
       error: false
     });
@@ -44,7 +65,9 @@ exports.register = async (req, res) => {
 };
 
 
+
 // Login
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -64,16 +87,25 @@ exports.login = async (req, res) => {
         error: true
       });
     }
-    
+
+    // Update pro status if expired
+    await updateSubscriptionStatus(user);
+
     const token = jwt.sign(
       { id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+
     res.json({
       message: 'Login successful!',
       token,
-      data: { id: user._id, username: user.username, email: user.email },
+      data: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        subscription: user.subscription
+      },
       success: true,
       error: false
     });
@@ -87,10 +119,11 @@ exports.login = async (req, res) => {
   }
 };
 
+
 // Get profile of logged-in user
 exports.getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id, '-passwordHash');
+    let user = await User.findById(req.user._id, '-passwordHash');
     if (!user) {
       return res.status(404).json({
         message: 'User not found.',
@@ -98,8 +131,18 @@ exports.getProfile = async (req, res) => {
         error: true
       });
     }
+    user = await updateSubscriptionStatus(user);
+
     res.json({
-      data: user,
+      data: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        subscription: user.subscription,
+        profile: user.profile,
+        createdAt: user.createdAt
+      },
       success: true,
       error: false
     });
