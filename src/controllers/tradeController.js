@@ -69,6 +69,7 @@ exports.getTrades = async (req, res) => {
       Trade.countDocuments({ user_id: userId, ...dateFilter })
     ]);
 
+
     res.json({
       data: trades,
       meta: {
