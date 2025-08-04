@@ -59,6 +59,10 @@ exports.getTrades = async (req, res) => {
     // Query with pagination
     const [trades, total] = await Promise.all([
       Trade.find({ user_id: userId, ...dateFilter })
+        .populate('strategy', 'name')
+        .populate('outcome_summary', 'name')
+        .populate('rules_followed', 'name')
+        .populate('psychology.emotional_state', 'name')
         .sort({ date: -1 })
         .skip(skip)
         .limit(safeLimit),
