@@ -220,3 +220,121 @@ exports.updateAvatar = async (req, res) => {
 };
 
 
+// PATCH /api/users/username
+exports.changeUsername = async (req, res) => {
+  try {
+    const { newUsername } = req.body;
+
+    if (!newUsername || typeof newUsername !== "string" || newUsername.length < 3) {
+      return res.status(400).json({
+        message: "Username must be at least 3 characters.",
+        success: false,
+        error: true
+      });
+    }
+    // Ensure uniqueness
+    const exists = await User.findOne({ username: newUsername });
+    if (exists) {
+      return res.status(409).json({
+        message: "Username is already taken.",
+        success: false,
+        error: true
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { username: newUsername },
+      { new: true, select: "-passwordHash" }
+    );
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found.",
+        success: false,
+        error: true
+      });
+    }
+
+    res.json({
+      message: "Username updated successfully.",
+      data: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        subscription: user.subscription,
+        profile: user.profile,
+        createdAt: user.createdAt
+      },
+      success: true,
+      error: false
+    });
+  } catch (error) {
+    console.error("[ChangeUsername] Error:", error.message);
+    res.status(500).json({
+      message: error.message,
+      success: false,
+      error: true
+    });
+  }
+};
+
+
+// PATCH /api/users/password
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        message: "New password must be at least 6 characters.",
+        success: false,
+        error: true
+      });
+    }
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found.",
+        success: false,
+        error: true
+      });
+    }
+    // Check current password is correct
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({
+        message: "Current password is incorrect.",
+        success: false,
+        error: true
+      });
+    }
+    // Prevent changing to the same password
+    const sameAsBefore = await bcrypt.compare(newPassword, user.passwordHash);
+    if (sameAsBefore) {
+      return res.status(400).json({
+        message: "New password cannot be the same as the old password.",
+        success: false,
+        error: true
+      });
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({
+      message: "Password changed successfully.",
+      success: true,
+      error: false
+    });
+  } catch (error) {
+    console.error("[ChangePassword] Error:", error.message);
+    res.status(500).json({
+      message: error.message,
+      success: false,
+      error: true
+    });
+  }
+};
+
+
+
