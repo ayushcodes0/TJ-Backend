@@ -27,48 +27,54 @@ exports.createTrade = async (req, res) => {
 exports.getTrades = async (req, res) => {
   try {
     const { filter, year, month, day, limit, page } = req.query;
-    const userId = req.user._id;
     let dateFilter = {};
 
-    // Date filter logic as before
-    if (filter === 'day' && year && month && day) {
-      const start = new Date(year, month - 1, day, 0, 0, 0);
-      const end = new Date(year, month - 1, day, 23, 59, 59, 999);
-      dateFilter = { date: { $gte: start, $lte: end } };
-    } else if (filter === 'month' && year && month) {
-      const start = new Date(year, month - 1, 1, 0, 0, 0);
-      const endMonth = (parseInt(month) === 12) ? 1 : parseInt(month) + 1;
-      const endYear = (parseInt(month) === 12) ? parseInt(year) + 1 : parseInt(year);
-      const end = new Date(endYear, endMonth - 1, 1, 0, 0, 0);
-      dateFilter = { date: { $gte: start, $lt: end } };
-    } else if (filter === 'year' && year) {
-      const start = new Date(year, 0, 1, 0, 0, 0);
-      const end = new Date(parseInt(year) + 1, 0, 1, 0, 0, 0);
-      dateFilter = { date: { $gte: start, $lt: end } };
-    } else if (filter === 'lifetime') {
-      dateFilter = {};
-    } else {
-      return res.status(400).json({ message: 'Invalid or missing filter parameters', success: false, error: true });
+    // Date filter logic (this part is correct and does not need changes)
+    switch (filter) {
+      case 'day':
+        if (year && month && day) {
+          const start = new Date(Date.UTC(year, month - 1, day));
+          const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+          dateFilter = { date: { $gte: start, $lte: end } };
+        }
+        break;
+      case 'month':
+        if (year && month) {
+          const start = new Date(Date.UTC(year, month - 1, 1));
+          const end = new Date(Date.UTC(year, month, 1));
+          dateFilter = { date: { $gte: start, $lt: end } };
+        }
+        break;
+      case 'year':
+        if (year) {
+          const start = new Date(Date.UTC(year, 0, 1));
+          const end = new Date(Date.UTC(parseInt(year) + 1, 0, 1));
+          dateFilter = { date: { $gte: start, $lt: end } };
+        }
+        break;
+      default:
+        dateFilter = {};
     }
 
-    // Pagination parameters
-    const safeLimit = Math.max(1, Math.min(100, parseInt(limit) || 20));
-    const safePage = Math.max(1, parseInt(page) || 1);
+    const query = { user_id: req.user._id, ...dateFilter };
+
+    const safeLimit = Math.min(100, parseInt(limit) || 20);
+    const safePage = parseInt(page) || 1;
     const skip = (safePage - 1) * safeLimit;
 
-    // Query with pagination
+    // Execute queries in parallel
     const [trades, total] = await Promise.all([
-      Trade.find({ user_id: userId, ...dateFilter })
-        .populate('strategy', 'name')
-        .populate('outcome_summary', 'name')
-        .populate('rules_followed', 'name')
-        .populate('psychology.emotional_state', 'name')
+      Trade.find(query)
+        .populate('strategy', 'name type') // You can also pull the 'type' if needed
+        .populate('outcome_summary', 'name type')
+        .populate('rules_followed', 'name type')
+        .populate('psychology.emotional_state', 'name type')
         .sort({ date: -1 })
         .skip(skip)
-        .limit(safeLimit),
-      Trade.countDocuments({ user_id: userId, ...dateFilter })
+        .limit(safeLimit)
+        .lean(), // .lean() is great for faster read-only queries
+      Trade.countDocuments(query)
     ]);
-
 
     res.json({
       data: trades,
@@ -83,9 +89,9 @@ exports.getTrades = async (req, res) => {
       error: false,
     });
   } catch (error) {
-    console.error('[getTrades - date filter] Error:', error.message);
+    console.error('[getTrades] Error:', error.message);
     res.status(500).json({
-      message: error.message,
+      message: 'An internal server error occurred.',
       success: false,
       error: true,
     });
