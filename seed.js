@@ -1,60 +1,58 @@
-// seed.js
 const mongoose = require('mongoose');
-require('dotenv').config();
+const dotenv = require('dotenv');
 
-const Strategy = require('./src/models/Strategy');
-const OutcomeSummary = require('./src/models/OutcomeSummary');
-const RulesFollowed = require('./src/models/RulesFollowed');
-const EmotionalState = require('./src/models/EmotionalState');
+// --- FIX: The path should point directly to your models folder from the root ---
+// It should not be in a 'src' directory unless your models folder is actually there.
+const Option = require('./src/models/Option');
 
-// Default dropdown options
-const defaultStrategies = [
-  "Breakout", "Reversal", "Scalping", "Swing", "Range-Bound",
-  "Momentum", "News-Driven", "Trend Continuation", "Intraday", "Overnight", "Other"
-];
-const defaultOutcomeSummaries = [
-  "Mistake", "Followed Plan", "Partial Success", "Full Success"
-];
-const defaultRulesFollowed = [
-  "Followed Risk Management (1-2% risk)",
-  "Waited for entry confirmation",
-  "Traded in direction of higher timeframe trend",
-  "Had volume confirmation",
-  "Avoided revenge trading",
-  "Excercised patience before entry"
-];
-const defaultEmotionalStates = [
-  "Calm", "Anxious", "Excited", "Confident", 
-  "Frustrated", "Overconfident", "Neutral"
+dotenv.config();
+
+const DEFAULT_OPTIONS = [
+  // Strategies
+  { type: 'Strategy', name: 'Breakout' }, { type: 'Strategy', name: 'Reversal' },
+  { type: 'Strategy', name: 'Scalping' }, { type: 'Strategy', name: 'Swing' },
+  { type: 'Strategy', name: 'Range Bound' }, { type: 'Strategy', name: 'Momentum' },
+  { type: 'Strategy', name: 'News Driven' }, { type: 'Strategy', name: 'Trend Continuation' },
+  { type: 'Strategy', name: 'Intraday' }, { type: 'Strategy', name: 'Overnight' },
+  { type: 'Strategy', name: 'Other' },
+  // Outcomes
+  { type: 'OutcomeSummary', name: 'Mistake' }, { type: 'OutcomeSummary', name: 'Followed Plan' },
+  { type: 'OutcomeSummary', name: 'Partial Success' }, { type: 'OutcomeSummary', name: 'Full Success' },
+  // Rules Followed
+  { type: 'RulesFollowed', name: 'Followed risk management (1-2% risk)' },
+  { type: 'RulesFollowed', name: 'Waited for entry confirmation' },
+  { type: 'RulesFollowed', name: 'Traded in direction of higher timeframe trend' },
+  { type: 'RulesFollowed', name: 'Had volume confirmation' },
+  { type: 'RulesFollowed', name: 'Exercised patience before entry' },
+  // Emotional States
+  { type: 'EmotionalState', name: 'Calm' }, { type: 'EmotionalState', name: 'Frustrated' },
+  { type: 'EmotionalState', name: 'Anxious' }, { type: 'EmotionalState', name: 'Overconfident' },
+  { type: 'EmotionalState', name: 'Impatient' },
 ];
 
-async function seedCollection(Model, values, labelField) {
-  for (const value of values) {
-    const query = { [labelField]: value, user_id: null, is_default: true };
-    const exists = await Model.findOne(query);
-    if (!exists) {
-      await Model.create({ [labelField]: value, user_id: null, is_default: true });
-      console.log(`Inserted: "${value}" into ${Model.collection.name}`);
-    } else {
-      console.log(`Already seeded: "${value}" in ${Model.collection.name}`);
-    }
+const seedDatabase = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log('MongoDB connected for seeding...');
+
+    // This logic correctly uses the 'Option' model to create the defaults.
+    const operations = DEFAULT_OPTIONS.map(option => 
+      Option.findOneAndUpdate(
+        { user_id: null, type: option.type, name: option.name },
+        { $setOnInsert: { user_id: null, type: option.type, name: option.name } },
+        { upsert: true }
+      )
+    );
+
+    await Promise.all(operations);
+
+    console.log('Database has been successfully seeded with default options!');
+  } catch (error) {
+    console.error('Error seeding database:', error);
+  } finally {
+    await mongoose.disconnect();
+    console.log('MongoDB disconnected.');
   }
-}
+};
 
-async function main() {
-  await mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  });
-  await seedCollection(Strategy, defaultStrategies, 'name');
-  await seedCollection(OutcomeSummary, defaultOutcomeSummaries, 'label');
-  await seedCollection(RulesFollowed, defaultRulesFollowed, 'label');
-  await seedCollection(EmotionalState, defaultEmotionalStates, 'label');
-  console.log('Seeding complete!');
-  process.exit(0);
-}
-
-main().catch(err => {
-  console.error('Seeding error:', err);
-  process.exit(1);
-});
+seedDatabase();

@@ -45,7 +45,8 @@ const createOption = async (req, res) => {
 
   const { name, type } = req.body;
 
-  const allowedCreationTypes = ['Strategy', 'RulesFollowed']; // Only allow users to create these types
+// controllers/optionController.js
+const allowedCreationTypes = ['Strategy', 'RulesFollowed', 'EmotionalState'];
   if (!name || !type || !allowedCreationTypes.includes(type)) {
     return res.status(400).json({ message: 'A valid name and type (Strategy or RulesFollowed) are required.' });
   }
