@@ -7,6 +7,7 @@ const app = express();
 
 const tradeRoutes = require('./routes/tradeRoutes');
 const userRoutes = require('./routes/userRoutes');
+const optionRoutes = require('./routes/optionRoutes')
 
 // Middleware
 app.use(express.json());
@@ -15,9 +16,7 @@ app.use(helmet());
 
 app.use('/api/trades', tradeRoutes);
 app.use('/api/users', userRoutes);
-
-
-
+app.use("/api/options", optionRoutes);
 
 
 // Health check route

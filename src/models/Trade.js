@@ -1,26 +1,16 @@
 const mongoose = require('mongoose');
 
 const MISTAKE_OPTIONS = [
-  "Overtrading",
-  "Risk too much",
-  "Exited too late",
-  "Ignored signals",
-  "Ignored stop loss",
-  "Revenge trading",
-  "Exited too early",
-  "Fomo entry",
-  "No clear plan",
-  "No mistakes"
+  "Overtrading", "Risk too much", "Exited too late", "Ignored signals",
+  "Ignored stop loss", "Revenge trading", "Exited too early", "Fomo entry",
+  "No clear plan", "No mistakes"
 ];
 
 const psychologySchema = new mongoose.Schema({
   entry_confidence_level: { type: Number, min: 1, max: 10 },
   satisfaction_rating: { type: Number, min: 1, max: 10 },
-  emotional_state: { type: mongoose.Schema.Types.ObjectId, ref: 'EmotionalState' }, // Dropdown
-  mistakes_made: [{ // Checkbox
-    type: String,
-    enum: MISTAKE_OPTIONS
-  }],
+  emotional_state: { type: mongoose.Schema.Types.ObjectId, ref: 'Option' },
+  mistakes_made: [{ type: String, enum: MISTAKE_OPTIONS }],
   lessons_learned: { type: String }
 }, { _id: false });
 
@@ -35,16 +25,15 @@ const tradeSchema = new mongoose.Schema({
   direction: { type: String, enum: ['Long', 'Short'], required: true },
   stop_loss: { type: Number },
   target: { type: Number },
-  strategy: { type: mongoose.Schema.Types.ObjectId, ref: 'Strategy', required: true }, // Dropdown
+  strategy: { type: mongoose.Schema.Types.ObjectId, ref: 'Option', required: true },
   trade_analysis: { type: String },
-  outcome_summary: { type: mongoose.Schema.Types.ObjectId, ref: 'OutcomeSummary', required: true }, // Dropdown
-  rules_followed: [{ type: mongoose.Schema.Types.ObjectId, ref: 'RulesFollowed' }], // Dropdown
+  outcome_summary: { type: mongoose.Schema.Types.ObjectId, ref: 'Option', required: true },
+  rules_followed: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Option' }],
   pnl_amount: { type: Number },
   pnl_percentage: { type: Number },
   holding_period_minutes: { type: Number },
   tags: [{ type: String }],
   psychology: psychologySchema,
-  createdAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
 tradeSchema.index({ user_id: 1, date: -1 });
