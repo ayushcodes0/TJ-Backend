@@ -1,55 +1,60 @@
+// src/controllers/aiController.js
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // Initialize the Google AI client with the API key from your .env file
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-/**
- * Controller to analyze a user's trading data.
- * Expects an array of trade objects in the request body.
- */
 const analyzeTrades = async (req, res) => {
   const { trades } = req.body;
 
-  // Basic validation to ensure trades data is present
   if (!trades || !Array.isArray(trades) || trades.length === 0) {
     return res.status(400).json({ error: 'Trade data is required and must be a non-empty array.' });
   }
 
-  // This is the core prompt that instructs the AI. You can refine this over time.
+  // --- THIS IS THE MODIFIED PROMPT ---
   const prompt = `
     You are an expert trading coach and performance analyst for a trading journal application. 
-    Your tone should be insightful, constructive, and professional. Analyze the following trading data and provide a concise summary.
+    Your tone should be insightful, constructive, and highly data-driven. Analyze the following trading data and provide a detailed summary.
 
-    **Your analysis must include the following sections, using Markdown for formatting:**
-    
+    **Your analysis must include the following sections, precisely in this order, using Markdown for all formatting:**
+
     ### 1. Overall Performance Summary
-    A brief paragraph summarizing the key results, including overall profitability and win rate. Start with an encouraging but realistic overview.
+    A brief paragraph summarizing the key results, referencing the specific metrics calculated below.
 
-    ### 2. Key Strengths & Winning Patterns
-    Identify the top 2-3 most profitable patterns or strengths. Be specific about what works. For example:
-    - "Your strategy of taking long positions on NIFTY after a morning consolidation shows a high win rate."
-    - "You excel at managing risk on BANKNIFTY trades with a risk-to-reward ratio greater than 1:2."
+    ### 2. Quantitative Performance Metrics
+    Generate a Markdown table with the following metrics. The table must have two columns: "Metric" and "Value".
+    - Total Net P&L (Profit/Loss)
+    - Win Rate (%)
+    - Loss Rate (%)
+    - Average P&L per Trade
+    - Average Winning Trade
+    - Average Losing Trade
+    - Profit Factor (Total Profit from Winners / Absolute Total Loss from Losers)
 
-    ### 3. Areas for Improvement & Costly Mistakes
-    Identify the top 2-3 recurring mistakes that are hurting performance. Be direct but constructive. For example:
-    - "A pattern of 'revenge trading' after a loss is noticeable, leading to larger subsequent losses."
-    - "Holding onto losing option trades for too long, especially on expiry days, is a significant drain on profits."
+    ### 3. Best & Worst Trades
+    Generate a Markdown table identifying the single best and single worst trade by P&L amount. The table must have four columns: "Category", "Symbol", "P&L", "Strategy".
 
-    ### 4. Actionable Advice
-    Provide 2-3 concrete, actionable steps the trader can take to improve their performance based on your analysis. For example:
-    - "Recommendation 1: Implement a strict 'cool-down' period of 1 hour after two consecutive losing trades."
-    - "Recommendation 2: Focus more capital on your high-performing NIFTY setup and reduce position size on speculative option buys."
+    ### 4. Key Strengths & Winning Patterns
+    Based on the data and tables above, identify the top 2-3 most profitable patterns or strengths. Be specific and use data to back up your claims. For example:
+    - "Your 'Breakout' strategy on NIFTY was particularly effective, netting a total of ₹X across Y trades."
+
+    ### 5. Areas for Improvement & Costly Mistakes
+    Based on the data and tables above, identify the top 2-3 recurring mistakes that are hurting performance. Be specific and use data. For example:
+    - "Holding losing 'Scalping' trades resulted in an average loss of ₹Y, which is significantly higher than your average winning trade."
+    - "Your win rate on 'Short' direction trades is only Z%, suggesting a potential weakness in that area."
+
+    ### 6. Actionable Advice
+    Provide 2-3 concrete, actionable steps the trader can take to improve, directly referencing the analysis above. For example:
+    - "Recommendation 1: Given your high Profit Factor with the 'Breakout' strategy, consider allocating more capital to these specific setups."
+    - "Recommendation 2: Implement a stricter stop-loss on all 'Scalping' trades to reduce the impact of your 'Average Losing Trade' metric."
 
     **Trader's Data to Analyze:**
     ${JSON.stringify(trades, null, 2)}
   `;
 
   try {
-    // Select the generative model
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    // Generate content based on the prompt
     const result = await model.generateContent(prompt);
     const response = result.response;
     const analysisResult = response.text();
@@ -62,21 +67,14 @@ const analyzeTrades = async (req, res) => {
   }
 };
 
-/**
- * Controller for a simple test to verify the AI connection.
- * Uses a hardcoded prompt.
- */
 const testAIConnection = async (req, res) => {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     const prompt = "Hello! Please confirm you are working by responding with only the following text: 'AI connection successful.'";
-
     const result = await model.generateContent(prompt);
     const response = result.response;
     const text = response.text();
-
     res.status(200).json({ message: "Test successful", response: text });
-
   } catch (error) {
     console.error('AI Test Connection Error:', error);
     res.status(500).json({ message: "Test failed", error: error.message });
