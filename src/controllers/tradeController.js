@@ -26,16 +26,30 @@ exports.createTrade = async (req, res) => {
 
 exports.getTrades = async (req, res) => {
   try {
-    const { filter, year, month, day, limit, page } = req.query;
+    const { filter, year, month, day, week, limit, page } = req.query;
     let dateFilter = {};
 
-    // Date filter logic (this part is correct and does not need changes)
+    // Date filter logic
     switch (filter) {
       case 'day':
         if (year && month && day) {
           const start = new Date(Date.UTC(year, month - 1, day));
           const end = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
           dateFilter = { date: { $gte: start, $lte: end } };
+        }
+        break;
+      case 'week':
+        if (year && week) {
+          // Calculate start of the week (ISO week number)
+          const startOfYear = new Date(Date.UTC(year, 0, 1));
+          const startOfWeek = new Date(startOfYear);
+          startOfWeek.setUTCDate(startOfYear.getUTCDate() + (week - 1) * 7);
+          
+          const endOfWeek = new Date(startOfWeek);
+          endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
+          endOfWeek.setUTCHours(23, 59, 59, 999);
+          
+          dateFilter = { date: { $gte: startOfWeek, $lte: endOfWeek } };
         }
         break;
       case 'month':
@@ -53,6 +67,7 @@ exports.getTrades = async (req, res) => {
         }
         break;
       default:
+        // 'lifetime' or any other value
         dateFilter = {};
     }
 
@@ -65,14 +80,14 @@ exports.getTrades = async (req, res) => {
     // Execute queries in parallel
     const [trades, total] = await Promise.all([
       Trade.find(query)
-        .populate('strategy', 'name type') // You can also pull the 'type' if needed
+        .populate('strategy', 'name type')
         .populate('outcome_summary', 'name type')
         .populate('rules_followed', 'name type')
         .populate('psychology.emotional_state', 'name type')
         .sort({ date: -1 })
         .skip(skip)
         .limit(safeLimit)
-        .lean(), // .lean() is great for faster read-only queries
+        .lean(),
       Trade.countDocuments(query)
     ]);
 
@@ -97,6 +112,7 @@ exports.getTrades = async (req, res) => {
     });
   }
 };
+
 
 
 
