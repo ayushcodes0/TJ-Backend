@@ -15,7 +15,7 @@ passport.use(new GoogleStrategy({
     let user = await User.findOne({ googleId: profile.id });
 
     if (user) {
-      console.log('Existing Google user found:', user.email);
+      console.log('Existing Google user found - NO PRO TRIAL:', user.email);
       return done(null, user);
     }
 
@@ -23,31 +23,43 @@ passport.use(new GoogleStrategy({
     user = await User.findOne({ email: profile.emails[0].value });
 
     if (user) {
-      // Link Google account to existing user
+      // Link Google account to existing user - NO PRO TRIAL (already registered)
       user.googleId = profile.id;
       user.provider = 'google';
       await user.save();
-      console.log('Linked Google to existing user:', user.email);
+      console.log('Linked Google to existing user - NO PRO TRIAL:', user.email);
       return done(null, user);
     }
 
-    // Create new user
+    // CREATE NEW USER - ASSIGN 24-HOUR PRO TRIAL
+    const now = new Date();
+    const proExpiry = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24 hours from now
+
     const newUser = new User({
       googleId: profile.id,
-      name: profile.displayName,
-      username: `google_${profile.id}`, // Generate unique username
+      name: profile.displayName || profile.name?.givenName + ' ' + profile.name?.familyName || 'Google User',
+      username: `google_${profile.id}`,
       email: profile.emails[0].value,
-      avatar: profile.photos.value,
+      avatar: profile.photos?.value || '',
       provider: 'google',
-      passwordHash: 'google_auth', // Placeholder since it's not needed for Google auth
+      passwordHash: 'google_auth_placeholder',
+      
+      // ASSIGN PRO TRIAL FOR 24 HOURS
+      subscription: {
+        plan: 'pro',
+        startedAt: now,
+        expiresAt: proExpiry
+      },
+      
       profile: {
-        displayName: profile.displayName,
+        displayName: profile.displayName || 'Google User',
         preferences: {}
       }
     });
 
     await newUser.save();
-    console.log('New Google user created:', newUser.email);
+    console.log('🎉 NEW GOOGLE USER WITH 24H PRO TRIAL:', newUser.email);
+    console.log('Pro expires at:', proExpiry);
     return done(null, newUser);
   } catch (error) {
     console.error('Google Auth Error:', error);

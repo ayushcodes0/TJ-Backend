@@ -26,9 +26,9 @@ router.get('/auth/google',
 router.get('/auth/google/callback',
   passport.authenticate('google', { 
     failureRedirect: `${process.env.CLIENT_URL}/login?error=auth_failed`,
-    session: false // Important: disable sessions since we're using JWT
+    session: false
   }),
-  googleAuthController.googleCallback
+  googleAuthController.googleCallback  // Make sure this function exists
 );
 
 // Optional: Get Google user profile
