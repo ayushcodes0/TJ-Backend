@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, trim: true },
   passwordHash: { type: String, required: true },
   isAdmin: { type: Boolean, default: false },
-  avatar: { type: String },
+  avatar: { type: String, maxlength: 500 },
   subscription: {
     plan: { type: String, enum: ['free', 'pro', 'enterprise'], default: 'free' },
     startedAt: { type: Date },
