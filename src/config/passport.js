@@ -1,4 +1,4 @@
-// src/config/passport.js
+// src/config/passport.js - Corrected version
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
@@ -9,7 +9,7 @@ passport.use(new GoogleStrategy({
   callbackURL: "/api/users/auth/google/callback"
 }, async (accessToken, refreshToken, profile, done) => {
   try {
-    console.log('Google Profile:', profile);
+    console.log('Google Profile received');
     
     // Check if user already exists with this Google ID
     let user = await User.findOne({ googleId: profile.id });
@@ -31,16 +31,16 @@ passport.use(new GoogleStrategy({
       return done(null, user);
     }
 
-    // CREATE NEW USER - Use real name for both name and username
+    // CREATE NEW USER
     const now = new Date();
-    const proExpiry = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24 hours from now
+    const proExpiry = new Date(now.getTime() + (24 * 60 * 60 * 1000));
     
     // Extract real name from Google profile
     const realName = profile.displayName || 
                     (profile.name?.givenName + ' ' + profile.name?.familyName) || 
                     'Google User';
     
-    // Handle username uniqueness - if same name exists, add number
+    // Handle username uniqueness
     let uniqueUsername = realName;
     let counter = 1;
     
@@ -49,12 +49,21 @@ passport.use(new GoogleStrategy({
       counter++;
     }
 
+    // Get avatar URL correctly
+    let avatarUrl = '';
+    
+    if (profile.photos && profile.photos.length > 0) {
+      avatarUrl = profile.photos[0].value;
+    }
+    
+    console.log('🖼️ Avatar URL extracted:', avatarUrl);
+
     const newUser = new User({
       googleId: profile.id,
-      name: realName,           // "John Doe"
-      username: uniqueUsername, // "John Doe" (or "John Doe 1" if duplicate)
-      email: profile.emails[0].value,
-      avatar: profile.photos?.value || '',
+      name: realName,
+      username: uniqueUsername,
+      email: profile.emails[0].value, // ✅ Fixed this line
+      avatar: avatarUrl,
       provider: 'google',
       passwordHash: 'google_auth_placeholder',
       
@@ -72,7 +81,10 @@ passport.use(new GoogleStrategy({
     });
 
     await newUser.save();
-    console.log('🎉 NEW GOOGLE USER WITH REAL NAME:', newUser.username);
+    console.log('🎉 NEW GOOGLE USER CREATED');
+    console.log('Username:', newUser.username);
+    console.log('Email:', newUser.email);
+    console.log('Avatar saved in DB:', newUser.avatar);
     return done(null, newUser);
   } catch (error) {
     console.error('Google Auth Error:', error);
