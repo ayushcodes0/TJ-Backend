@@ -15,7 +15,7 @@ passport.use(new GoogleStrategy({
     let user = await User.findOne({ googleId: profile.id });
 
     if (user) {
-      console.log('Existing Google user found - NO PRO TRIAL:', user.email);
+      console.log('Existing Google user found:', user.email);
       return done(null, user);
     }
 
@@ -23,22 +23,36 @@ passport.use(new GoogleStrategy({
     user = await User.findOne({ email: profile.emails[0].value });
 
     if (user) {
-      // Link Google account to existing user - NO PRO TRIAL (already registered)
+      // Link Google account to existing user
       user.googleId = profile.id;
       user.provider = 'google';
       await user.save();
-      console.log('Linked Google to existing user - NO PRO TRIAL:', user.email);
+      console.log('Linked Google to existing user:', user.email);
       return done(null, user);
     }
 
-    // CREATE NEW USER - ASSIGN 24-HOUR PRO TRIAL
+    // CREATE NEW USER - Use real name for both name and username
     const now = new Date();
     const proExpiry = new Date(now.getTime() + (24 * 60 * 60 * 1000)); // 24 hours from now
+    
+    // Extract real name from Google profile
+    const realName = profile.displayName || 
+                    (profile.name?.givenName + ' ' + profile.name?.familyName) || 
+                    'Google User';
+    
+    // Handle username uniqueness - if same name exists, add number
+    let uniqueUsername = realName;
+    let counter = 1;
+    
+    while (await User.findOne({ username: uniqueUsername })) {
+      uniqueUsername = `${realName} ${counter}`;
+      counter++;
+    }
 
     const newUser = new User({
       googleId: profile.id,
-      name: profile.displayName || profile.name?.givenName + ' ' + profile.name?.familyName || 'Google User',
-      username: `google_${profile.id}`,
+      name: realName,           // "John Doe"
+      username: uniqueUsername, // "John Doe" (or "John Doe 1" if duplicate)
       email: profile.emails[0].value,
       avatar: profile.photos?.value || '',
       provider: 'google',
@@ -52,14 +66,13 @@ passport.use(new GoogleStrategy({
       },
       
       profile: {
-        displayName: profile.displayName || 'Google User',
+        displayName: realName,
         preferences: {}
       }
     });
 
     await newUser.save();
-    console.log('🎉 NEW GOOGLE USER WITH 24H PRO TRIAL:', newUser.email);
-    console.log('Pro expires at:', proExpiry);
+    console.log('🎉 NEW GOOGLE USER WITH REAL NAME:', newUser.username);
     return done(null, newUser);
   } catch (error) {
     console.error('Google Auth Error:', error);
