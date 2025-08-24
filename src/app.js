@@ -12,6 +12,7 @@ const tradeRoutes = require('./routes/tradeRoutes');
 const userRoutes = require('./routes/userRoutes');
 const optionRoutes = require('./routes/optionRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const contactRoutes = require('./routes/contactRoutes'); 
 
 // Middleware
 app.use(express.json());
@@ -30,6 +31,8 @@ app.use('/api/trades', tradeRoutes);
 app.use('/api/users', userRoutes); // Google auth routes are now here
 app.use("/api/options", optionRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/contact", contactRoutes); 
+
 
 // Health check route
 app.get('/', (req, res) => {
