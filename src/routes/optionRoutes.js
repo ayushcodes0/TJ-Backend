@@ -1,10 +1,17 @@
-
+// src/routes/optionRoutes.js
 const express = require('express');
 const router = express.Router();
 const { getOptions, createOption } = require('../controllers/optionController');
-const auth = require('../middlewares/auth'); // Assuming your middleware is named 'auth'
+const auth = require('../middlewares/auth');
+const { tradeLimiter } = require('../middlewares/rateLimiter');
 
-router.get("/", auth, getOptions);
-router.post("/", auth, createOption);
+// All routes require authentication
+router.use(auth);
+
+// GET options (no additional rate limiting needed)
+router.get("/", getOptions);
+
+// CREATE options (apply rate limiting to prevent spam)
+router.post("/", tradeLimiter, createOption);
 
 module.exports = router;

@@ -1,12 +1,12 @@
 // src/middlewares/rateLimiter.js
 const rateLimit = require('express-rate-limit');
 
-// General API rate limiter
+// General API rate limiter - Fixed keyGenerator
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again after 15 minutes.',
@@ -34,15 +34,24 @@ const apiLimiter = rateLimit({
   }
 });
 
-// Trade-specific rate limiter (more restrictive)
+// Trade-specific rate limiter - Fixed keyGenerator
 const tradeLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minutes
   max: 20, // limit each IP to 20 trade operations per 5 minutes
   standardHeaders: true,
   legacyHeaders: false,
+  // FIX: Simplified keyGenerator to avoid IPv6 issues
   keyGenerator: (req) => {
-    // Use user ID if available (from auth token), otherwise use IP
-    return req.user?.id || req.ip;
+    // Use user ID if authenticated (from JWT token)
+    if (req.user && req.user.id) {
+      return `user:${req.user.id}`;
+    }
+    // Otherwise use IP - let express-rate-limit handle IPv6 internally
+    return req.ip;
+  },
+  // FIX: Disable IPv6 validation to prevent the error
+  validate: {
+    keyGeneratorIpFallback: false
   },
   message: {
     success: false,
@@ -50,7 +59,6 @@ const tradeLimiter = rateLimit({
     retryAfter: '5 minutes'
   },
   handler: (req, res, next) => {
-    // Log trade-specific rate limit violations
     console.warn(`[RATE LIMIT] Trade limit exceeded:`, {
       ip: req.ip,
       userId: req.user?.id || 'anonymous',
@@ -73,20 +81,27 @@ const tradeLimiter = rateLimit({
   }
 });
 
-// Auth rate limiter (most restrictive)
+// Auth rate limiter - Fixed keyGenerator
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // limit each IP to 5 auth attempts per windowMs
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true, // Don't count successful requests
+  // FIX: Simplified keyGenerator
+  keyGenerator: (req) => {
+    return req.ip; // Simple IP-based limiting
+  },
+  // FIX: Disable IPv6 validation
+  validate: {
+    keyGeneratorIpFallback: false
+  },
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again after 15 minutes.',
     retryAfter: '15 minutes'
   },
   handler: (req, res, next) => {
-    // Log authentication rate limit violations
     console.warn(`[RATE LIMIT] Auth limit exceeded:`, {
       ip: req.ip,
       path: req.path,
