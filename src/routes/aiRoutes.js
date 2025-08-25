@@ -47,7 +47,7 @@ const aiLimiter = rateLimit({
 });
 
 // Apply AI rate limiter and auth to analyze endpoint
-router.post('/analyze', auth, aiLimiter, analyzeTrades);
+router.post('/analyze', aiLimiter, analyzeTrades);
 
 // Test endpoint (no auth required, but rate limited)
 router.get('/test', aiLimiter, testAIConnection);
