@@ -16,6 +16,8 @@ const userRoutes = require('./routes/userRoutes');
 const optionRoutes = require('./routes/optionRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const contactRoutes = require('./routes/contactRoutes'); 
+const paymentRoutes = require('./routes/paymentRoutes');
+
 
 // Middleware
 app.use(express.json());
@@ -57,6 +59,7 @@ app.use('/api/users', authLimiter, userRoutes); // Apply auth limiter to user ro
 app.use("/api/options", optionRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/contact", contactRoutes); 
+app.use('/api/payments', paymentRoutes);
 
 // Health check route (no rate limiting)
 app.get('/', (req, res) => {
