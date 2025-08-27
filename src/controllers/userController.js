@@ -336,5 +336,52 @@ exports.changePassword = async (req, res) => {
   }
 };
 
+// Add this to your userController.js file
+
+// Update user subscription to Pro after successful payment
+exports.updateSubscriptionToPro = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { paymentId } = req.body; // Optional: store payment ID for reference
+    
+    // Find user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: 'User not found.',
+        success: false,
+        error: true
+      });
+    }
+
+    // Update subscription to Pro for 30 days
+    user.subscription.plan = 'pro';
+    user.subscription.startedAt = new Date();
+    user.subscription.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+    await user.save();
+
+    res.json({
+      message: 'Subscription upgraded to Pro successfully!',
+      data: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        subscription: user.subscription,
+        avatar: user.avatar
+      },
+      success: true,
+      error: false
+    });
+
+  } catch (error) {
+    console.error('[UpdateSubscription] Error:', error.message);
+    res.status(500).json({
+      message: 'Failed to update subscription.',
+      success: false,
+      error: true
+    });
+  }
+};
 
 

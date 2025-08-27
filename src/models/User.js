@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
   isAdmin: { type: Boolean, default: false },
   avatar: { type: String, maxlength: 500 },
   subscription: {
-    plan: { type: String, enum: ['free', 'pro', 'enterprise'], default: 'free' },
+    plan: { type: String, enum: ['free', 'pro'], default: 'free' },
     startedAt: { type: Date },
     expiresAt: { type: Date }
   },
