@@ -41,6 +41,6 @@ router.get('/auth/google/callback',
 // Optional: Get Google user profile (no rate limiting needed for GET)
 router.get('/auth/google/profile', auth, googleAuthController.getGoogleProfile);
 
-router.put('/:id/subscription', userController.updateSubscriptionToPro);
+router.put('/:id/subscription', auth, userController.updateSubscriptionToPro);
 
 module.exports = router;
