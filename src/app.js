@@ -32,7 +32,7 @@ const passport = require('passport');
 app.use(passport.initialize());
 
 // Apply general rate limiting to all API routes
-app.use('/api');
+// app.use('/api', apiLimiter);
 
 // Log successful requests for monitoring
 app.use('/api', (req, res, next) => {
