@@ -4,7 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 // Import rate limiters
-const { apiLimiter, authLimiter } = require('./middlewares/rateLimiter');
+// const { apiLimiter, authLimiter } = require('./middlewares/rateLimiter');
 
 // Import passport configuration
 require('./config/passport'); // This initializes the passport strategy
@@ -32,7 +32,7 @@ const passport = require('passport');
 app.use(passport.initialize());
 
 // Apply general rate limiting to all API routes
-app.use('/api', apiLimiter);
+app.use('/api');
 
 // Log successful requests for monitoring
 app.use('/api', (req, res, next) => {
