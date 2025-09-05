@@ -55,7 +55,7 @@ app.use('/api', (req, res, next) => {
 
 // Mount the existing routes
 app.use('/api/trades', tradeRoutes); // Trade-specific limiter applied in routes
-app.use('/api/users', authLimiter, userRoutes); // Apply auth limiter to user routes
+app.use('/api/users', userRoutes); // Apply auth limiter to user routes
 app.use("/api/options", optionRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/contact", contactRoutes); 
