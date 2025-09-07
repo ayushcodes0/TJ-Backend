@@ -2,17 +2,19 @@ const razorpay = require('../services/razorpayService');
 const crypto = require('crypto');
 
 // Create Razorpay Order
+// paymentController.js - Update createOrder function
 const createOrder = async (req, res) => {
   try {
-    const { amount, userId } = req.body;
+    const { amount, userId, planType = 'monthly' } = req.body;
     
     const options = {
-      amount: amount * 100, // Convert to paise (₹99 = 9900 paise)
+      amount: amount * 100, // Convert to paise
       currency: 'INR',
       receipt: `receipt_${Date.now()}_${userId}`,
       notes: {
         userId: userId,
         plan: 'Pro Subscription',
+        planType: planType, // Add plan type to notes
         service: 'TradeJournalAI'
       }
     };
@@ -24,7 +26,8 @@ const createOrder = async (req, res) => {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID
+      keyId: process.env.RAZORPAY_KEY_ID,
+      planType: planType // Return plan type to frontend
     });
   } catch (error) {
     console.error('Create Order Error:', error);

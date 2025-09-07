@@ -1,3 +1,4 @@
+// subscription.js - Update the helper function
 exports.updateSubscriptionStatus = async (user) => {
   if (
     user.subscription &&
@@ -7,10 +8,10 @@ exports.updateSubscriptionStatus = async (user) => {
   ) {
     // Expired: downgrade to free
     user.subscription.plan = 'free';
+    user.subscription.type = 'monthly'; // Reset type as well
     user.subscription.startedAt = null;
     user.subscription.expiresAt = null;
     await user.save();
   }
-  // Optional: for enterprise plan, expand this logic.
   return user;
 };

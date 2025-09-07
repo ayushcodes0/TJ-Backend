@@ -340,7 +340,7 @@ exports.changePassword = async (req, res) => {
 exports.updateSubscriptionToPro = async (req, res) => {
   try {
     const userId = req.params.id;
-    const { paymentId } = req.body; // Optional: store payment ID for reference
+    const { paymentId, planType = 'monthly' } = req.body; // Added planType parameter
     
     // Find user by ID
     const user = await User.findById(userId);
@@ -352,15 +352,28 @@ exports.updateSubscriptionToPro = async (req, res) => {
       });
     }
 
-    // Update subscription to Pro for 30 days
+    // Calculate expiration based on plan type
+    const startDate = new Date();
+    let expirationDate = new Date();
+    
+    if (planType === 'annual') {
+      // 1 year subscription (365 days)
+      expirationDate.setFullYear(expirationDate.getFullYear() + 1);
+    } else {
+      // Default to monthly (30 days)
+      expirationDate.setDate(expirationDate.getDate() + 30);
+    }
+
+    // Update subscription to Pro with plan type
     user.subscription.plan = 'pro';
-    user.subscription.startedAt = new Date();
-    user.subscription.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+    user.subscription.type = planType; // Store the plan type
+    user.subscription.startedAt = startDate;
+    user.subscription.expiresAt = expirationDate;
 
     await user.save();
 
     res.json({
-      message: 'Subscription upgraded to Pro successfully!',
+      message: `Subscription upgraded to Pro ${planType} successfully!`,
       data: {
         id: user._id,
         username: user.username,

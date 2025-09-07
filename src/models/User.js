@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
   avatar: { type: String, maxlength: 500 },
   subscription: {
     plan: { type: String, enum: ['free', 'pro'], default: 'free' },
+    type: { type: String, enum: ['monthly', 'annual'], default: 'monthly' },
     startedAt: { type: Date },
     expiresAt: { type: Date }
   },
