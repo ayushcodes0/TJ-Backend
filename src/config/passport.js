@@ -33,7 +33,7 @@ passport.use(new GoogleStrategy({
 
     // CREATE NEW USER
     const now = new Date();
-    const proExpiry = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+    const proExpiry = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)); // 7 days from now
     
     // Extract real name from Google profile
     const realName = profile.displayName || 

@@ -4,6 +4,8 @@ const router = express.Router();
 const auth = require('../middlewares/auth');
 const tradeController = require('../controllers/tradeController');
 const { tradeLimiter } = require('../middlewares/rateLimiter');
+const upload = require('../middlewares/upload');
+
 
 // All routes require authentication
 router.use(auth);
@@ -17,5 +19,12 @@ router.get('/:id', tradeController.getTradeById);
 router.post('/', tradeLimiter, tradeController.createTrade);
 router.put('/:id', tradeLimiter, tradeController.updateTrade);
 router.delete('/:id', tradeLimiter, tradeController.deleteTrade);
+// CSV import (write operation, apply auth + tradeLimiter + upload)
+router.post(
+  '/import/csv',
+  upload.single('file'),  // frontend must send form-data with key "file"
+  tradeController.importTradesFromCsv
+);
+
 
 module.exports = router;

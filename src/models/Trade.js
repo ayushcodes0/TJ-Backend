@@ -27,6 +27,7 @@ const psychologySchema = new mongoose.Schema({
 const tradeSchema = new mongoose.Schema({
   user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   symbol: { type: String, required: true, index: true },
+  asset_type: { type: String, required: true, index: true },
   date: { type: Date, required: true, index: true },
   quantity: { type: Number, required: true },
   total_amount: { type: Number },

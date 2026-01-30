@@ -1,5 +1,8 @@
 const Trade = require('../models/Trade');
 const mongoose = require('mongoose');
+const fs = require('fs');
+const csv = require('csv-parser');
+
 
 
 // Create a new trade
@@ -304,3 +307,108 @@ exports.getTradeStats = async (req, res) => {
   }
 };
 
+
+
+// helper to normalize header names
+const normalizeHeader = (str = '') =>
+  str.trim().toLowerCase().replace(/\s+/g, ' ');
+
+// Import trades from CSV (Zerodha Tradebook / generic broker)
+// Import trades from CSV (Zerodha tradebook-FO2.csv)
+exports.importTradesFromCsv = async (req, res) => {
+  const filePath = req.file?.path;
+
+  if (!filePath) {
+    return res.status(400).json({
+      message: 'CSV file is required',
+      success: false,
+      error: true,
+    });
+  }
+
+  const userId = req.user._id;
+  const tradesToInsert = [];
+
+  try {
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(filePath)
+        .pipe(csv())
+        .on('data', (row) => {
+          try {
+            const symbol = row.symbol;
+            const qty = parseFloat(row.quantity || '0');
+            const price = parseFloat(row.price || '0');
+            const rawDate = row.trade_date;
+            const sideRaw = String(row.trade_type || '').toLowerCase();
+
+            if (!symbol || !qty || !price) return;
+
+            const direction = sideRaw === 'sell' ? 'Short' : 'Long';
+            const date = rawDate ? new Date(rawDate) : new Date();
+
+            tradesToInsert.push({
+              user_id: userId,
+              symbol,
+              asset_type: 'F&O',
+              date,
+              quantity: qty,
+              total_amount: qty * price,
+              entry_price: price,
+              exit_price: undefined,
+              direction,
+              strategy: null,
+              outcome_summary: null,
+              pnl_amount: 0,
+              pnl_percentage: 0,
+              stop_loss: undefined,
+              target: undefined,
+              trade_analysis: '',
+              rules_followed: [],
+              holding_period_minutes: undefined,
+              tags: ['imported', 'zerodha-tradebook'],
+              psychology: {
+                entry_confidence_level: undefined,
+                satisfaction_rating: undefined,
+                emotional_state: null,
+                mistakes_made: [],
+                lessons_learned: '',
+              },
+            });
+          } catch (rowErr) {
+            console.error('[importTradesFromCsv] Row parse error:', rowErr.message);
+          }
+        })
+        .on('end', resolve)
+        .on('error', reject);
+    });
+
+    if (!tradesToInsert.length) {
+      fs.unlink(filePath, () => {});
+      return res.status(400).json({
+        message: 'No valid trades found in CSV',
+        success: false,
+        error: true,
+      });
+    }
+
+    console.log('[importTradesFromCsv] tradesToInsert length:', tradesToInsert.length);
+    const inserted = await Trade.insertMany(tradesToInsert);
+    fs.unlink(filePath, () => {});
+
+    return res.status(201).json({
+      data: inserted,
+      importedCount: inserted.length,
+      message: 'Trades imported successfully from CSV',
+      success: true,
+      error: false,
+    });
+  } catch (error) {
+    console.error('[importTradesFromCsv] Error message:', error.message);
+    fs.unlink(filePath, () => {});
+    return res.status(500).json({
+      message: 'Failed to import trades from CSV',
+      success: false,
+      error: true,
+    });
+  }
+};

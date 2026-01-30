@@ -1,6 +1,3 @@
-// src/controllers/aiController.js
-
-
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
@@ -12,78 +9,100 @@ const analyzeTrades = async (req, res) => {
     return res.status(400).json({ error: 'Trade data is required.' });
   }
 
-  // --- THE NEW, JSON-FOCUSED PROMPT ---
   const prompt = `
-    You are a data analyst for a trading journal. Your task is to analyze the provided trade data and return a single, valid JSON object. 
-    Do NOT include any text, notes, or markdown formatting outside of the JSON structure.
+    You are a data analyst for a trading journal. Analyze the provided trade data and return ONLY a valid JSON object with no additional text, explanations, or markdown formatting.
 
-    The JSON object must have the following structure:
+    Return exactly this JSON structure (replace placeholder values with actual analysis):
     {
-      "performanceSummary": "A one-paragraph summary of the overall trading performance.",
-      "confidenceLevel": A number between 0 and 10 representing the average confidence level from the psychology data,
+      "performanceSummary": "A one-paragraph summary of the overall trading performance based on the data provided.",
+      "confidenceLevel": 7,
       "keyMetrics": [
-        { "metric": "Total Net P&L", "value": "A formatted string like '₹X,XXX.XX'", "sentiment": "positive" or "negative" },
-        { "metric": "Win Rate", "value": "XX.X%", "sentiment": "positive", "neutral" or "negative" },
-        { "metric": "Profit Factor", "value": "X.XX", "sentiment": "positive", "neutral" or "negative" },
+        { "metric": "Total Net P&L", "value": "₹X,XXX.XX", "sentiment": "positive" },
+        { "metric": "Win Rate", "value": "XX.X%", "sentiment": "positive" },
+        { "metric": "Profit Factor", "value": "X.XX", "sentiment": "positive" },
         { "metric": "Average Winning Trade", "value": "₹X,XXX.XX", "sentiment": "neutral" },
         { "metric": "Average Losing Trade", "value": "₹X,XXX.XX", "sentiment": "neutral" }
       ],
       "strengths": [
-        "A string describing the first key strength.",
-        "A string describing the second key strength."
+        "First key strength based on the data",
+        "Second key strength based on the data"
       ],
       "weaknesses": [
-        "A string describing the first area for improvement.",
-        "A string describing the second area for improvement."
+        "First area for improvement based on the data", 
+        "Second area for improvement based on the data"
       ],
       "actionableAdvice": [
-        "A string with the first piece of actionable advice.",
-        "A string with the second piece of actionable advice."
+        "First piece of actionable advice based on the analysis",
+        "Second piece of actionable advice based on the analysis"
       ]
     }
 
-    Base your analysis on this data:
+    Calculate all metrics from this trade data:
     ${JSON.stringify(trades, null, 2)}
+
+    Remember: Return ONLY the JSON object, no other text.
   `;
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-      }
+      model: "models/gemini-2.5-flash", // Updated model
     });
 
     const result = await model.generateContent(prompt);
-    const response = result.response;
-    
+    const response = await result.response;
+
     let jsonString = response.text();
 
-    // --- FALLBACK MECHANISM ---
-    // Find the first '{' and the last '}' to extract the JSON object
+    // Extract valid JSON
     const startIndex = jsonString.indexOf('{');
     const endIndex = jsonString.lastIndexOf('}');
-
     if (startIndex !== -1 && endIndex !== -1) {
       jsonString = jsonString.substring(startIndex, endIndex + 1);
+    } else {
+      throw new Error('No valid JSON found in response');
     }
-    
+
     const analysisData = JSON.parse(jsonString);
+
+    if (!analysisData.performanceSummary || !analysisData.keyMetrics) {
+      throw new Error('Invalid analysis data structure');
+    }
+
     res.status(200).json({ analysis: analysisData });
 
   } catch (error) {
-    console.error('Error processing AI request:', error);
-    // Let's provide a more descriptive error to the frontend
-    if (error instanceof SyntaxError) {
-      res.status(500).json({ error: 'AI returned malformed data. Could not parse the analysis.' });
-    } else {
-      res.status(500).json({ error: 'An error occurred while communicating with the AI service.' });
-    }
+    console.error('Full error:', error);
+    res.status(500).json({ error: error.message, details: JSON.stringify(error) });
   }
 };
 
 const testAIConnection = async (req, res) => {
-    // ... (no changes needed for the test controller)
+  try {
+    const model = genAI.getGenerativeModel({ 
+      model: "models/gemini-2.5-flash" // Updated model
+    });
+
+    const testPrompt = 'Respond with exactly this JSON: {"status": "success", "message": "API connection working"}';
+
+    const result = await model.generateContent(testPrompt);
+    const response = await result.response;
+    const text = response.text();
+
+    res.json({ 
+      success: true, 
+      message: 'Google AI Studio API connection successful!',
+      response: text,
+      model: 'models/gemini-2.5-flash'
+    });
+
+  } catch (error) {
+    console.error('Test connection error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      errorDetails: JSON.stringify(error)
+    });
+  }
 };
 
 module.exports = {
